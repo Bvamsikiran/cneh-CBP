@@ -1,0 +1,7 @@
+{
+  "name": "ML-Based Website Vulnerability Detection Simulator",
+  "description": "Academic CNEH cybersecurity simulator integrating passive reconnaissance features with machine learning risk classification and OWASP ZAP verification.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
