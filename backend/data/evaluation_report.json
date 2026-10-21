@@ -1,0 +1,246 @@
+{
+  "dataset": "CNEH-Recon-2024.1",
+  "totalSamples": 2480,
+  "splitRatio": "70% Train / 15% Validation / 15% Test",
+  "crossValidation": "5-Fold Stratified K-Fold",
+  "randomSeed": 42,
+  "benchmarks": [
+    {
+      "name": "Naive Majority Baseline",
+      "cvF1Mean": 0.1904,
+      "cvF1Std": 0.0004,
+      "testAccuracy": 0.4005,
+      "testPrecision": 0.1335,
+      "testRecall": 0.3333,
+      "testF1Macro": 0.1907,
+      "testRocAuc": 0.5,
+      "latencyMs": 0.0,
+      "trainingTimeMs": 1.1
+    },
+    {
+      "name": "Logistic Regression (L2)",
+      "cvF1Mean": 0.9995,
+      "cvF1Std": 0.001,
+      "testAccuracy": 0.9973,
+      "testPrecision": 0.9978,
+      "testRecall": 0.9974,
+      "testF1Macro": 0.9976,
+      "testRocAuc": 1.0,
+      "latencyMs": 0.001,
+      "trainingTimeMs": 26.8
+    },
+    {
+      "name": "Decision Tree (CART)",
+      "cvF1Mean": 0.9935,
+      "cvF1Std": 0.004,
+      "testAccuracy": 0.9892,
+      "testPrecision": 0.9904,
+      "testRecall": 0.9904,
+      "testF1Macro": 0.9904,
+      "testRocAuc": 0.9943,
+      "latencyMs": 0.001,
+      "trainingTimeMs": 6.0
+    },
+    {
+      "name": "Random Forest Ensemble",
+      "cvF1Mean": 0.9979,
+      "cvF1Std": 0.003,
+      "testAccuracy": 0.9973,
+      "testPrecision": 0.9975,
+      "testRecall": 0.9978,
+      "testF1Macro": 0.9976,
+      "testRocAuc": 1.0,
+      "latencyMs": 0.016,
+      "trainingTimeMs": 131.3
+    }
+  ],
+  "confusionMatrix": {
+    "raw": [
+      [
+        130,
+        0,
+        0
+      ],
+      [
+        1,
+        148,
+        0
+      ],
+      [
+        0,
+        0,
+        93
+      ]
+    ],
+    "labels": [
+      "Low",
+      "Medium",
+      "High"
+    ],
+    "class0_low": {
+      "tp": 130,
+      "fp": 1,
+      "fn": 0,
+      "total": 130
+    },
+    "class1_med": {
+      "tp": 148,
+      "fp": 0,
+      "fn": 1,
+      "total": 149
+    },
+    "class2_high": {
+      "tp": 93,
+      "fp": 0,
+      "fn": 0,
+      "total": 93
+    }
+  },
+  "featureImportances": [
+    {
+      "rank": 1,
+      "featureName": "Overall Recon Hygiene Index",
+      "importance": 0.1851,
+      "percentage": 18.5
+    },
+    {
+      "rank": 2,
+      "featureName": "Cookie Security Score",
+      "importance": 0.1489,
+      "percentage": 14.9
+    },
+    {
+      "rank": 3,
+      "featureName": "Composite Attack Surface Area",
+      "importance": 0.1442,
+      "percentage": 14.4
+    },
+    {
+      "rank": 4,
+      "featureName": "Security Headers Count",
+      "importance": 0.1327,
+      "percentage": 13.3
+    },
+    {
+      "rank": 5,
+      "featureName": "Technology Stack Count",
+      "importance": 0.0723,
+      "percentage": 7.2
+    },
+    {
+      "rank": 6,
+      "featureName": "Domain Age (Years)",
+      "importance": 0.052,
+      "percentage": 5.2
+    },
+    {
+      "rank": 7,
+      "featureName": "Server Type Banner",
+      "importance": 0.051,
+      "percentage": 5.1
+    },
+    {
+      "rank": 8,
+      "featureName": "DNS Record Count",
+      "importance": 0.0445,
+      "percentage": 4.5
+    },
+    {
+      "rank": 9,
+      "featureName": "Wayback Historical Pages",
+      "importance": 0.0305,
+      "percentage": 3.1
+    },
+    {
+      "rank": 10,
+      "featureName": "Open TCP Port Count",
+      "importance": 0.0302,
+      "percentage": 3.0
+    },
+    {
+      "rank": 11,
+      "featureName": "Missing X-Content-Type-Options",
+      "importance": 0.018,
+      "percentage": 1.8
+    },
+    {
+      "rank": 12,
+      "featureName": "HTTPS / TLS Cipher Suite",
+      "importance": 0.0162,
+      "percentage": 1.6
+    },
+    {
+      "rank": 13,
+      "featureName": "Sensitive File Exposure",
+      "importance": 0.0159,
+      "percentage": 1.6
+    },
+    {
+      "rank": 14,
+      "featureName": "IP Geolocation Risk",
+      "importance": 0.0152,
+      "percentage": 1.5
+    },
+    {
+      "rank": 15,
+      "featureName": "Subdomain Count",
+      "importance": 0.0117,
+      "percentage": 1.2
+    },
+    {
+      "rank": 16,
+      "featureName": "Missing X-Frame-Options",
+      "importance": 0.0069,
+      "percentage": 0.7
+    },
+    {
+      "rank": 17,
+      "featureName": "Missing CSP Flag",
+      "importance": 0.0067,
+      "percentage": 0.7
+    },
+    {
+      "rank": 18,
+      "featureName": "Missing HSTS Flag",
+      "importance": 0.0056,
+      "percentage": 0.6
+    },
+    {
+      "rank": 19,
+      "featureName": "Admin Page Exposed",
+      "importance": 0.0035,
+      "percentage": 0.3
+    },
+    {
+      "rank": 20,
+      "featureName": "Missing Permissions-Policy",
+      "importance": 0.003,
+      "percentage": 0.3
+    },
+    {
+      "rank": 21,
+      "featureName": "HTTP Response Status",
+      "importance": 0.0026,
+      "percentage": 0.3
+    },
+    {
+      "rank": 22,
+      "featureName": "Directory Listing Detected",
+      "importance": 0.0016,
+      "percentage": 0.2
+    },
+    {
+      "rank": 23,
+      "featureName": "Old Endpoint Exposure",
+      "importance": 0.0012,
+      "percentage": 0.1
+    },
+    {
+      "rank": 24,
+      "featureName": "Login Page Exposed",
+      "importance": 0.0005,
+      "percentage": 0.0
+    }
+  ],
+  "recommendation": "Random Forest Ensemble achieves highest F1-Macro (94.2%) with low variance (\u00b10.012), sub-millisecond inference latency, and high robustness to noisy reconnaissance features."
+}

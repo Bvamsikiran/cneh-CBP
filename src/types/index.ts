@@ -185,3 +185,18 @@ export interface FeatureImportanceItem {
   importance: number; // 0.0 - 1.0
   percentage: number;
 }
+
+export interface ReconExtractStep {
+  step: string;
+  status: 'pending' | 'in-progress' | 'completed' | 'failed';
+  detail: string;
+}
+
+export interface ReconExtractResponse {
+  success: boolean;
+  features: ReconFeatures;
+  detectedDetails: Record<string, any>;
+  steps: ReconExtractStep[];
+  durationMs: number;
+  error?: string | null;
+}

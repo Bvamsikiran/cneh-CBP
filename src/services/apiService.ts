@@ -13,6 +13,7 @@ import {
   FeatureImportanceItem,
   ModelMetrics,
   ReconFeatures,
+  ReconExtractResponse,
 } from '../types';
 import { runReconInference } from './analysisEngine';
 import {
@@ -50,7 +51,7 @@ class AnalysisApiService {
   async checkBackendHealth(): Promise<{ online: boolean; message: string }> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
 
       const res = await fetch('/api/health', { signal: controller.signal });
       clearTimeout(timeoutId);
@@ -74,9 +75,65 @@ class AnalysisApiService {
   }
 
   /**
+   * Automated Reconnaissance Extraction:
+   * Takes a website URL and extracts all 24 features (WHOIS, IP, DNS, Headers, SSL, Ports)
+   */
+  async extractReconFeatures(
+    url: string,
+    mode: 'passive' | 'active' = 'active'
+  ): Promise<ReconExtractResponse> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout for network scans
+
+      const res = await fetch('/api/recon/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, mode }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data: ReconExtractResponse = await res.json();
+        return data;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Extraction failed with status ${res.status}`);
+      }
+    } catch (err: any) {
+      console.warn('Backend extractReconFeatures failed or offline, falling back:', err);
+      throw err;
+    }
+  }
+
+  /**
    * Submit 24 reconnaissance features for inference
    */
   async analyzeWebsite(features: ReconFeatures): Promise<AnalysisResult> {
+    try {
+      // Attempt Python FastAPI Scikit-Learn inference first
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(features),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const result: AnalysisResult = await res.json();
+        this.saveAnalysis(result);
+        return result;
+      }
+    } catch (err) {
+      console.info('Backend ML engine offline or failed, using client-side engine:', err);
+    }
+
+    // Fallback to deterministic client-side inference engine
     const result = runReconInference(features, false);
     this.saveAnalysis(result);
     return result;

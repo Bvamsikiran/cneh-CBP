@@ -13,15 +13,26 @@ import {
   Info,
   Check,
   AlertCircle,
+  Zap,
+  Loader2,
+  CheckCircle2,
+  Sparkles,
+  Clock,
+  Radio,
+  Layers,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   GeolocationRisk,
   HttpsCipher,
   HttpStatus,
   ReconFeatures,
+  ReconExtractStep,
   ServerType,
 } from '../../types';
 import { DEFAULT_RECON_FEATURES } from '../../services/analysisEngine';
+import { apiService } from '../../services/apiService';
 
 interface NewAnalysisScreenProps {
   onStartAnalysis: (features: ReconFeatures) => void;
@@ -44,6 +55,62 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
   const [formData, setFormData] = useState<ReconFeatures>({ ...DEFAULT_RECON_FEATURES });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [draftSavedMessage, setDraftSavedMessage] = useState(false);
+  
+  // Automated Reconnaissance State
+  const [reconMode, setReconMode] = useState<'passive' | 'active'>('active');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionSteps, setExtractionSteps] = useState<ReconExtractStep[]>([]);
+  const [extractionDuration, setExtractionDuration] = useState<number | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [showReconDetails, setShowReconDetails] = useState(false);
+  const [autoDetectedFields, setAutoDetectedFields] = useState<Set<string>>(new Set());
+
+  const handleAutoExtract = async () => {
+    const rawUrl = formData.websiteUrl.trim();
+    if (!rawUrl) {
+      setErrors((prev) => ({ ...prev, websiteUrl: 'Please enter a website URL or domain first.' }));
+      return;
+    }
+    setErrors({});
+    setExtractionError(null);
+    setIsExtracting(true);
+    setShowReconDetails(true);
+    setExtractionDuration(null);
+    setExtractionSteps([
+      { step: 'DNS & IP Resolution', status: 'in-progress', detail: `Resolving DNS and IP address for ${rawUrl}...` },
+      { step: 'WHOIS Registry Query', status: 'pending', detail: 'Querying domain registration and age calculation...' },
+      { step: 'IP Geolocation & ASN', status: 'pending', detail: 'Checking IP routing, hosting ASN, and country risk...' },
+      { step: 'HTTP Headers & TLS Inspection', status: 'pending', detail: 'Analyzing CSP, HSTS, X-Frame-Options, server banner, and cipher suite...' },
+      { step: 'Archive History & Exposure Checks', status: 'pending', detail: reconMode === 'active' ? 'Checking open ports 80/443/8080 and sensitive paths...' : 'Checking Wayback Machine snapshots (stealth)...' }
+    ]);
+
+    try {
+      const res = await apiService.extractReconFeatures(rawUrl, reconMode);
+      if (res.success && res.features) {
+        setFormData(res.features);
+        if (res.steps && res.steps.length > 0) {
+          setExtractionSteps(res.steps);
+        }
+        setExtractionDuration(res.durationMs);
+        setAutoDetectedFields(new Set(Object.keys(res.features)));
+      } else {
+        setExtractionError(res.error || 'Failed to extract reconnaissance features.');
+      }
+    } catch (err: any) {
+      setExtractionError(err?.message || 'Reconnaissance extraction failed. Please check network connection or FastAPI server.');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const renderBadge = (key: string) => {
+    if (!autoDetectedFields.has(key)) return null;
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-mono border border-emerald-500/30 shrink-0">
+        <Sparkles className="w-2.5 h-2.5 text-emerald-400" /> Auto-Detected
+      </span>
+    );
+  };
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -216,9 +283,12 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Target Name <span className="text-rose-400">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-slate-300">
+                  Target Name <span className="text-rose-400">*</span>
+                </label>
+                {renderBadge('targetName')}
+              </div>
               <input
                 type="text"
                 value={formData.targetName}
@@ -237,9 +307,12 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Website / URL <span className="text-rose-400">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-slate-300">
+                  Website / URL <span className="text-rose-400">*</span>
+                </label>
+                {renderBadge('websiteUrl')}
+              </div>
               <div className="flex">
                 <span className="inline-flex items-center px-2.5 text-xs bg-slate-800/80 border border-r-0 border-slate-800 text-slate-400 rounded-l font-mono">
                   https://
@@ -248,7 +321,7 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
                   type="text"
                   value={formData.websiteUrl.replace(/^https?:\/\//, '')}
                   onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
-                  placeholder="portal.academic-demo.edu"
+                  placeholder="portal.academic-demo.edu or tesla.com"
                   className="w-full px-3 py-2 text-xs rounded-r bg-[#0B101B] border border-slate-800 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 font-mono"
                 />
               </div>
@@ -258,9 +331,149 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
                 </p>
               )}
               <span className="text-[10px] text-slate-500 mt-1 block">
-                Fully qualified domain name without trailing paths
+                Target domain name (e.g. vulnweb.com, example.edu, github.com)
               </span>
             </div>
+          </div>
+
+          {/* ⚡ Automated Reconnaissance Extractor Bar */}
+          <div className="mt-2 p-4 rounded-xl bg-gradient-to-r from-indigo-950/40 via-slate-900 to-slate-900/90 border border-indigo-500/30 shadow-inner">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-semibold text-white">Automated Reconnaissance Extractor</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
+                    FastAPI Service Connected
+                  </span>
+                  {extractionDuration && (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5" /> {(extractionDuration / 1000).toFixed(1)}s
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Enter any website URL above and click below to automatically extract WHOIS age, IP, DNS records, ASN risk, headers, and ports.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                {/* Recon Mode Toggle */}
+                <div className="flex bg-[#0B101B] p-1 rounded-lg border border-slate-800 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setReconMode('passive')}
+                    className={`px-2.5 py-1 rounded transition-all cursor-pointer font-medium ${
+                      reconMode === 'passive'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Passive Mode: Safe stealth query without port scanning or endpoint probing"
+                  >
+                    Passive Mode (Stealth)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReconMode('active')}
+                    className={`px-2.5 py-1 rounded transition-all cursor-pointer font-medium ${
+                      reconMode === 'active'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Active Mode: Probes web ports (80/443/8080) and checks exposure paths"
+                  >
+                    Active Recon (Deep)
+                  </button>
+                </div>
+
+                {/* Auto-Extract Button */}
+                <button
+                  type="button"
+                  disabled={isExtracting || !formData.websiteUrl.trim()}
+                  onClick={handleAutoExtract}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer shadow-md shadow-indigo-600/30"
+                >
+                  {isExtracting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                      <span>Extracting Recon Data...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                      <span>⚡ Auto-Extract & Fill All 24 Fields</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Live Progress Drawer / Checklist */}
+            {showReconDetails && (
+              <div className="mt-4 pt-3.5 border-t border-slate-800/80 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                    Reconnaissance Extraction Pipeline Status:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowReconDetails(!showReconDetails)}
+                    className="text-[11px] text-slate-400 hover:text-slate-200 flex items-center gap-1 cursor-pointer"
+                  >
+                    {showReconDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    {showReconDetails ? 'Hide Steps' : 'Show Steps'}
+                  </button>
+                </div>
+
+                {extractionError && (
+                  <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{extractionError}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {extractionSteps.map((step, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-2.5 rounded-lg border text-xs flex flex-col justify-between transition-all ${
+                        step.status === 'completed'
+                          ? 'bg-slate-950/60 border-emerald-500/30 text-slate-200'
+                          : step.status === 'in-progress'
+                          ? 'bg-indigo-950/40 border-indigo-500/50 text-indigo-200 animate-pulse'
+                          : 'bg-slate-950/30 border-slate-800/60 text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1.5 mb-1">
+                        <span className="font-semibold text-[11px] flex items-center gap-1.5">
+                          {step.status === 'completed' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                          {step.status === 'in-progress' && <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />}
+                          {step.status === 'pending' && <Clock className="w-3.5 h-3.5 text-slate-600 shrink-0" />}
+                          {step.step}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800">
+                          {step.status}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 line-clamp-2">{step.detail}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {!isExtracting && autoDetectedFields.size > 0 && (
+                  <div className="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-800/40 text-emerald-300 text-xs flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                      All 24 reconnaissance fields successfully populated with live data. Review or adjust values below before starting inference.
+                    </span>
+                    <span className="text-[10px] font-mono bg-emerald-900/50 px-2 py-0.5 rounded text-emerald-200">
+                      READY FOR MODEL INFERENCE
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -282,8 +495,11 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
             </p>
 
             <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-slate-300 font-medium">Domain Age (years)</span>
+              <div className="flex justify-between items-center text-xs mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-300 font-medium">Domain Age (years)</span>
+                  {renderBadge('domainAgeYears')}
+                </div>
                 <span className="font-mono text-indigo-300 font-semibold">
                   {formData.domainAgeYears} years
                 </span>
@@ -335,7 +551,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">IP Address</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-300">IP Address</label>
+                  {renderBadge('ipAddress')}
+                </div>
                 <input
                   type="text"
                   value={formData.ipAddress}
@@ -346,9 +565,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  DNS Record Count
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-300">DNS Record Count</label>
+                  {renderBadge('dnsRecordCount')}
+                </div>
                 <input
                   type="number"
                   min="1"
@@ -362,9 +582,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Subdomain Count
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-300">Subdomain Count</label>
+                  {renderBadge('subdomainCount')}
+                </div>
                 <input
                   type="number"
                   min="0"
@@ -380,9 +601,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  IP Geolocation Risk
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-300">IP Geolocation Risk</label>
+                  {renderBadge('ipGeolocationRisk')}
+                </div>
                 <select
                   value={formData.ipGeolocationRisk}
                   onChange={(e) =>
@@ -424,7 +646,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Server Type</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-300">Server Type</label>
+                  {renderBadge('serverType')}
+                </div>
                 <select
                   value={formData.serverType}
                   onChange={(e) =>
@@ -445,9 +670,12 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Technology Count
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-300">
+                    Technology Count
+                  </label>
+                  {renderBadge('technologyCount')}
+                </div>
                 <input
                   type="number"
                   min="1"
@@ -478,9 +706,12 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Historical Pages Count
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-300">
+                    Historical Pages Count
+                  </label>
+                  {renderBadge('historicalPagesCount')}
+                </div>
                 <input
                   type="number"
                   min="0"
@@ -499,9 +730,12 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Old Endpoint Exposure
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-300">
+                    Old Endpoint Exposure
+                  </label>
+                  {renderBadge('oldEndpointExposure')}
+                </div>
                 <div className="flex items-center gap-2 mt-2">
                   <button
                     type="button"
@@ -552,7 +786,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
             {/* Login Page Exposed */}
             <div className="p-3.5 rounded bg-[#0B101B] border border-slate-800/80 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-200">Login Page Exposed</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-medium text-slate-200">Login Page Exposed</span>
+                  {renderBadge('loginPageExposed')}
+                </div>
                 <button
                   type="button"
                   onClick={() =>
@@ -577,7 +814,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
             {/* Admin Page Exposed */}
             <div className="p-3.5 rounded bg-[#0B101B] border border-slate-800/80 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-200">Admin Page Exposed</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-medium text-slate-200">Admin Page Exposed</span>
+                  {renderBadge('adminPageExposed')}
+                </div>
                 <button
                   type="button"
                   onClick={() =>
@@ -602,7 +842,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
             {/* Sensitive File Exposure */}
             <div className="p-3.5 rounded bg-[#0B101B] border border-slate-800/80 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-200">Sensitive File Exposure</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-medium text-slate-200">Sensitive File Exposure</span>
+                  {renderBadge('sensitiveFileExposure')}
+                </div>
                 <button
                   type="button"
                   onClick={() =>
@@ -630,7 +873,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
             {/* Directory Listing Detected */}
             <div className="p-3.5 rounded bg-[#0B101B] border border-slate-800/80 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-200">Directory Listing Detected</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-medium text-slate-200">Directory Listing Detected</span>
+                  {renderBadge('directoryListingDetected')}
+                </div>
                 <button
                   type="button"
                   onClick={() =>
@@ -676,9 +922,12 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                HTTPS Enabled / Cipher
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-slate-300">
+                  HTTPS Enabled / Cipher
+                </label>
+                {renderBadge('httpsCipher')}
+              </div>
               <select
                 value={formData.httpsCipher}
                 onChange={(e) =>
@@ -696,7 +945,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">HTTP Status</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-slate-300">HTTP Status</label>
+                {renderBadge('httpStatus')}
+              </div>
               <select
                 value={formData.httpStatus}
                 onChange={(e) =>
@@ -713,9 +965,12 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Open Port Count
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-slate-300">
+                  Open Port Count
+                </label>
+                {renderBadge('openPortCount')}
+              </div>
               <input
                 type="number"
                 min="0"
@@ -734,9 +989,12 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
           {/* Missing Security Headers Interactive Checklist */}
           <div className="pt-2">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium text-slate-300">
-                Missing Security Headers (Select to mark as missing)
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-300">
+                  Missing Security Headers (Select to mark as missing)
+                </label>
+                {renderBadge('missingSecurityHeaders')}
+              </div>
               <span className="text-[11px] font-mono text-indigo-300">
                 {formData.missingSecurityHeaders.length} missing ({formData.securityHeadersCount} / 8 active)
               </span>
@@ -768,7 +1026,10 @@ export const NewAnalysisScreen: React.FC<NewAnalysisScreenProps> = ({
           {/* Cookie Security Score Slider */}
           <div className="pt-2">
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-slate-300 font-medium">Cookie Security Score</span>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-300 font-medium">Cookie Security Score</span>
+                {renderBadge('cookieSecurityScore')}
+              </div>
               <span className="font-mono text-indigo-300 font-semibold">
                 {formData.cookieSecurityScore} / 100
               </span>
